@@ -16,5 +16,5 @@ perl Makefile.PL && make && make test && make install
 
 3) Add the QueryParam namespace to your XSP pages
 
-  xmlns:session="http://www.axkit.org/2002/XSP/QueryParam"
+  xmlns:param="http://www.axkit.org/2002/XSP/QueryParam"
 

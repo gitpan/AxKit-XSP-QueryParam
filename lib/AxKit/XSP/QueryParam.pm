@@ -1,5 +1,5 @@
 package AxKit::XSP::QueryParam;
-# $Id: QueryParam.pm,v 1.1.1.1 2003/09/09 20:00:04 nachbaur Exp $
+# $Id: QueryParam.pm,v 1.6 2004/01/28 00:35:19 nachbaur Exp $
 use Apache;
 use Apache::Request;
 use Apache::AxKit::Language::XSP::TaglibHelper;
@@ -11,19 +11,20 @@ sub parse_end   { Apache::AxKit::Language::XSP::TaglibHelper::parse_end(@_); }
     'exists($name):isreally=paramexists',
     'remove($name)',
     'set($name,$value)',
-    'get($name)',
+    'get($name;$index)',
+    'count(;$name)',
     'if($name;$value):conditional=1:isreally=ifparam',
     'unless($name;$value):conditional=1:isreally=unlessparam',
     'if_regex($name,$value):conditional=1',
     'unless_regex($name,$value):conditional=1',
     'if_exists($name):conditional=1',
     'unless_exists($name):conditional=1',
-    'enumerate():listtag=param-list:itemtag=param:forcearray=1',
+    'enumerate(;$name):listtag=param-list:itemtag=param:forcearray=1',
 );
 
 @ISA = qw(Apache::AxKit::Language::XSP::TaglibHelper);
 $NS = 'http://www.axkit.org/2002/XSP/QueryParam';
-$VERSION = "0.01";
+$VERSION = "0.02";
 
 use strict;
 
@@ -123,25 +124,60 @@ sub set
 
 sub get
 {
-    my ( $name ) = @_;
+    my ( $name, $index ) = @_;
     my $r = Apache->request;
     my $req = Apache::Request->instance($r);
-    return $req->param($name);
+    my @values = $req->param($name);
+    if ($index) {
+        return $values[$index - 1];
+    } else {
+        return $values[0];
+    }
 }
 
 sub enumerate
 {
+    my ( $name ) = @_;
     my $r = Apache->request;
     my $req = Apache::Request->instance($r);
     my @tree = ();
-    my @params = $req->param;
-    foreach my $key (@params) {
-        push @tree, {
-            name  => $key,
-            value => $req->param($key),
-        };
+    if ($name) {
+        foreach my $value ($req->param($name)) {
+            push @tree, {
+                name  => $name,
+                value => $value,
+            };
+        }
+    } else {
+        foreach my $key ($req->param) {
+            foreach my $value ($req->param($key)) {
+                push @tree, {
+                    name  => $key,
+                    value => $value,
+                };
+            }
+        }
     }
     return @tree;
+}
+
+sub count
+{
+    my ( $name ) = @_;
+    my $r = Apache->request;
+    my $req = Apache::Request->instance($r);
+    if ($name) { 
+        my @values = $req->param($name);
+        return scalar(@values);
+    } else {
+        my $count = 0;
+        foreach my $key ($req->param) {
+            foreach my $value ($req->param($key)) {
+                $count++;
+            }
+        }
+        return $count;
+    }
 }
 
 1;
@@ -174,10 +210,15 @@ getting of parameter values.
 
 =head1 Tag Reference
 
-=head2 C<<param:get name="foo"/>>
+=head2 C<<param:get name="foo" index="1"/>>
 
 Get a value from the given parameter.  The "name" attribute can be passed
-as a child element for programattic access to parameter values.
+as a child element for programattic access to parameter values.  If the index
+attribute is supplied, and if multiple parameters are supplied for the
+same "name", then the appropriate parameter is returned.  If multiple values
+for the same parameter are given, but no index is supplied, the first value is
+returned. Now, if you can
+understand that convoluted set of instructions, then you're smarter than me!
 
 =head2 C<<param:set name="foo" value="bar"/>>
 
@@ -198,10 +239,14 @@ you get the idea.
 
 =head2 C<<param:enumerate/>>
 
-Returns an enumerated list of the parameter names present.  Now, you would
-B<think> that you can use child elements here, but you can't!  Ha, fooled you!
-This doesn't take any parameters, since it dumps the contents of the entire
-parameter list to a structured element.  It outputs something like the
+Returns an enumerated list of the parameter names present.  Now, it hardly
+needs to be said, but unfortunately, it will be said anyway: This tag can
+take a name attribute (or, well, see above) supplying the name of the parameter
+you want to enumerate.
+
+Why, you may ask, is this necessary?  If multiple parameters are supplied that
+all have an identical name, this attribute will allow you to enumerate all the
+appropriate name/value pairs for that key name.  It's output is something like the
 following:
 
   <param-list>
@@ -211,6 +256,12 @@ following:
     </param>
     ...
   </param-list>
+
+=head2 C<<param:count name="foo"/>>
+
+Returns the number of parameters provided on the request.  If a name is provided,
+the number of parameters supplied for the given name is returned.  If the name is
+left out, then the total number of parameters is returned.
 
 =head2 C<<param:if name="foo"></param:if>>
 
@@ -239,7 +290,7 @@ Michael A Nachbaur, mike@nachbaur.com
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2003 Michael A Nachbaur. All rights reserved. This program is
+Copyright (c) 2002-2004 Michael A Nachbaur. All rights reserved. This program is
 free software; you can redistribute it and/or modify it under the same
 terms as Perl itself.
 
