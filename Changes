@@ -1,0 +1,4 @@
+Revision history for Perl extension AxKit::XSP::QueryParam.
+
+0.01  Tue Sep  9 12:56:21 PDT 2003
+    - Finally rolled this package into a CPAN module
